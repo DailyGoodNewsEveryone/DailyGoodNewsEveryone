@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,b initial-scale=1.0"/>
+  <title>Good News, Everyone!</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      background: #0a1f44; 
+      color: #e0f7ff; 
+      margin: 0; 
+      padding: 20px; 
+      text-align: center; 
+    }
+    h1 { color: #ffcc00; font-size: 2.8em; margin-bottom: 10px; }
+    .prof { font-style: italic; color: #b0e0e6; }
+    button { 
+      background: #ff6600; 
+      color: white; 
+      border: none; 
+      padding: 12px 24px; 
+      margin: 10px; 
+      font-size: 1.2em; 
+      cursor: pointer; 
+      border-radius: 8px; 
+    }
+    button:hover { background: #ff8533; }
+    #story { 
+      max-width: 700px; 
+      margin: 30px auto; 
+      padding: 20px; 
+      background: rgba(255,255,255,0.1); 
+      border-radius: 12px; 
+      min-height: 150px; 
+    }
+    #loading { font-size: 1.3em; }
+  </style>
+</head>
+<body>
+  <h1>Good News, <span class="prof">Everyone!</span></h1>
+  <p style="font-size:1.1em;">Professor Farnsworth shares uplifting news from around the world</p>
+  
+  <button onclick="getGoodNews()">Good News Button!</button>
+  <button onclick="speakCurrent()" id="speakBtn" disabled>Speak (Farnsworth Mode)</button>
+  
+  <div id="story">
+    <p id="loading">Click the button for good news... Good news, everyone!</p>
+  </div>
+
+  <script>
+    let currentStory = { title: "", desc: "" };
+
+    async function getGoodNews() {
+      const loading = document.getElementById('loading');
+      const storyDiv = document.getElementById('story');
+      const speakBtn = document.getElementById('speakBtn');
+      
+      loading.textContent = "Consulting the lab...";
+      speakBtn.disabled = true;
+
+      try {
+        // Use rss2json proxy (free tier should handle casual use)
+        // Good News Network RSS: https://www.goodnewsnetwork.org/feed/
+        const proxyUrl = "https://api.rss2json.com/v1/api.json?rss_url=https://www.goodnewsnetwork.org/feed/";
+        
+        const response = await fetch(proxyUrl);
+        const data = await response.json();
+
+        if (data.status !== "ok" || !data.items?.length) {
+          throw new Error("No stories found");
+        }
+
+        // Pick a random recent positive story
+        const randomItem = data.items[Math.floor(Math.random() * Math.min(10, data.items.length))];
+
+        const title = randomItem.title.trim();
+        const desc = randomItem.description.replace(/<[^>]+>/g, '').trim(); // strip HTML
+
+        // Farnsworth-ify it!
+        let farnText = "Good news, everyone! " + title + ". ";
+        if (desc.length > 50) {
+          farnText += desc.substring(0, 150) + "... Eh?";
+        } else {
+          farnText += desc + " Whoop whoop whoop!";
+        }
+
+        currentStory = { title: title, desc: farnText };
+
+        storyDiv.innerHTML = `
+          <h2>${title}</h2>
+          <p>${desc}</p>
+          <p class="prof">"${farnText}" – Professor Farnsworth</p>
+        `;
+
+        speakBtn.disabled = false;
+        loading.textContent = "";
+      } catch (err) {
+        storyDiv.innerHTML = "<p>Oops! Lab equipment malfunction. Try again later. (Error: " + err.message + ")</p>";
+      }
+    }
+
+    function speakCurrent() {
+      if (!currentStory.desc) return;
+
+      const utterance = new SpeechSynthesisUtterance(currentStory.desc);
+      
+      // Try to make it sound old/professor-like
+      utterance.pitch = 0.7; // lower pitch
+      utterance.rate = 0.85; // slightly slower
+      utterance.volume = 1.0;
+
+      // Optional: pick an older-sounding voice if available (varies by browser/OS)
+      const voices = speechSynthesis.getVoices();
+      const oldVoice = voices.find(v => 
+        v.name.includes("Google UK English Male") || 
+        v.name.includes("Daniel") || 
+        v.name.toLowerCase().includes("older") || 
+        v.name.includes("Fred")
+      ) || voices.find(v => v.lang.startsWith("en-"));
+
+      if (oldVoice) utterance.voice = oldVoice;
+
+      speechSynthesis.speak(utterance);
+    }
+
+    // Load voices async (some browsers need this)
+    speechSynthesis.onvoiceschanged = () => {};
+    
+    // Optional: auto-load one on page open
+    // window.onload = getGoodNews;
+  </script>
+</body>
+</html>
